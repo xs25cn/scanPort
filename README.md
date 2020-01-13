@@ -4,7 +4,7 @@ ScanPort 端口扫描工具是一个可以检测服务器或是指定ip段的端
 ### 安装使用
 方法1. 你可以直接下载已编译好的文件直接运行
 
-https://github.com/xs25cn/scanPort/bin
+https://github.com/xs25cn/scanPort/tree/master/bin
 
 方法2. 你可以使用go命名进行下载，下载完成后会自动安装到你的$GOPATH/bin目录中
 
