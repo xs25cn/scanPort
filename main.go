@@ -4,8 +4,8 @@ import (
 	"flag"
 	"fmt"
 	"os"
-	"scanPort/lib"
-	"scanPort/scan"
+	"github.com/xs25cn/scanPort/lib"
+	"github.com/xs25cn/scanPort/scan"
 	"time"
 )
 
