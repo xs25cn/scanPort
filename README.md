@@ -19,23 +19,23 @@ scanPort -h
 Options:
   -h    帮助信息
   -ip string
-        ip地址 例如:-ip=192.168.0.1-255 或直接输入域名 xs25.cn (default "127.0.0.1")
+        ip地址 例如:-ip 192.168.0.1-255 或直接输入域名 xs25.cn (default "127.0.0.1")
   -n int
-        进程数 例如:-n=10 (default 100)
+        进程数 例如:-n 10 (default 100)
   -p string
-        端口号范围 例如:-p=80,81,88-1000 (default "80")
+        端口号范围 例如:-p 80,81,88-1000 (default "80")
   -path string
-        日志地址 例如:-path=log (default "log")
+        日志地址 例如:-path log (default "log")
   -t int
-        超时时长(毫秒) 例如:-t=200 (default 200)
+        超时时长(毫秒) 例如:-t 200 (default 200)
 
 ````
 #### 指定IP范围扫描
 
-scanPort -ip=192.168.0.1-255
+scanPort -ip 192.168.0.1-255
 
 #### 指定端口号扫描，如我们要扫描xs25.cn这台服务的开放端口，使用1000个协程进行
 
-scanport -p=80,81,88-3306 -ip=xs25.cn -n=1000 
+scanport -p 80,81,88-3306 -ip xs25.cn -n 1000 
 
 
