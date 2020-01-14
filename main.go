@@ -33,11 +33,8 @@ func main() {
 	lib.Mkdir(*path)
 
 	//初始化
-	scanIP := scan.ScanIp{
-		Debug:   true,
-		Timeout: *timeout,
-		Process: *process,
-	}
+	scanIP:=scan.NewScanIp(*timeout,*process,true)
+
 	ips, err := scanIP.GetAllIp(*ip)
 	if err != nil {
 		fmt.Println(err.Error())

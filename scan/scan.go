@@ -14,9 +14,17 @@ import (
 
 //ip 扫描
 type ScanIp struct {
-	Debug   bool
-	Timeout int
-	Process int
+	debug   bool
+	timeout int
+	process int
+}
+
+func NewScanIp(timeout int,process int,debug bool) *ScanIp {
+	return &ScanIp{
+		debug:debug,
+		timeout:timeout,
+		process:process,
+	}
 }
 
 //获取开放端口号
@@ -30,14 +38,14 @@ func (s *ScanIp) GetIpOpenPort(ip string, port string) []int {
 	)
 	ports, _ := s.getAllPort(port)
 	total = len(ports)
-	if total < s.Process {
+	if total < s.process {
 		pageCount = total
 	} else {
-		pageCount = s.Process
+		pageCount = s.process
 	}
 	num = int(math.Ceil(float64(total) / float64(pageCount)))
 
-	s.sendLog(fmt.Sprintf("%v 【%v】需要扫描端口总数:%v 个，总协程:%v 个，每个协程处理:%v 个，超时时间:%v毫秒", time.Now().Format("2006-01-02 15:04:05"), ip, total, pageCount, num, s.Timeout))
+	s.sendLog(fmt.Sprintf("%v 【%v】需要扫描端口总数:%v 个，总协程:%v 个，每个协程处理:%v 个，超时时间:%v毫秒", time.Now().Format("2006-01-02 15:04:05"), ip, total, pageCount, num, s.timeout))
 	start := time.Now()
 	all := map[int][]int{}
 	for i := 1; i <= pageCount; i++ {
@@ -70,9 +78,7 @@ func (s *ScanIp) GetIpOpenPort(ip string, port string) []int {
 		}(v, k)
 	}
 	wg.Wait()
-
 	s.sendLog(fmt.Sprintf("%v 【%v】扫描结束，执行时长%.3fs , 所有开放的端口:%v", time.Now().Format("2006-01-02 15:04:05"), ip, time.Since(start).Seconds(), openPorts))
-	time.Sleep(time.Second * 1)
 	return openPorts
 }
 
@@ -117,7 +123,7 @@ func (s *ScanIp) GetAllIp(ip string) ([]string, error) {
 
 //记录日志
 func (s *ScanIp) sendLog(str string) {
-	if s.Debug == true {
+	if s.debug == true {
 		fmt.Println(str)
 	}
 }
@@ -168,7 +174,7 @@ func (s *ScanIp) filterPort(str string) (int, error) {
 
 //查看端口号是否打开
 func (s *ScanIp) isOpen(ip string, port int) bool {
-	conn, err := net.DialTimeout("tcp", fmt.Sprintf("%s:%d", ip, port), time.Millisecond*time.Duration(s.Timeout))
+	conn, err := net.DialTimeout("tcp", fmt.Sprintf("%s:%d", ip, port), time.Millisecond*time.Duration(s.timeout))
 	if err != nil {
 		if strings.Contains(err.Error(),"too many open files"){
 			fmt.Println("连接数超出系统限制！"+err.Error())
