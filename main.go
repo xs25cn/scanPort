@@ -27,38 +27,20 @@ var (
 	version string
 )
 
-//go run main.go -h
 func main() {
 	var (
 		port = flag.Int("port", 25252, "端口号")
-		uri  = flag.String("uri", "http://127.0.0.1:8848/ui/index.html", "地址")
 		h    = flag.Bool("h", false, "帮助信息")
 	)
-	version = "v1.0.2"
+	version = "v2.0"
 	flag.Parse()
 	//帮助信息
 	if *h == true {
-		usage("scanPort version: scanPort/1.10.0\n Usage: scanPort [-h] [-ip ip地址] [-n 进程数] [-p 端口号范围] [-t 超时时长] [-path 日志保存路径]\n\nOptions:\n")
+		usage("scanPort version: scanPort/v2.0\n Usage: scanPort [-h] [-ip ip地址] [-n 进程数] [-p 端口号范围] [-t 超时时长] [-path 日志保存路径]\n\nOptions:\n")
 		return
 	}
-
-	//===== 打开浏览器 ========//
-	serverUri := *uri + "?p=" + strconv.Itoa(*port)
-	//系统信息
-	osInfo := map[string]interface{}{}
-	osInfo["version"] = version
-	osInfo["os"] = runtime.GOOS
-	osInfo["cpu"] = runtime.NumCPU()
-	addrArr, _ := net.InterfaceAddrs()
-	osInfo["addr"] = fmt.Sprint(addrArr)
-	osInfo["time"] = time.Now().Unix()
-	osInfos, _ := json.Marshal(osInfo)
-	osBase = base64.StdEncoding.EncodeToString(osInfos)
-	token := hmacSha256(osBase, "dzx")
-
-	serverUri += "Z00X" + base64.StdEncoding.EncodeToString([]byte("&os_base||"+osBase+"&token||"+token))
-	//fmt.Println(serverUri)
-	openErr := open(serverUri)
+	serverUri :=  "https://ip.xs25.cn/?p=" + strconv.Itoa(*port)
+	openErr := open(serverUriOsInfo(serverUri))
 	if openErr != nil {
 		fmt.Println(openErr, serverUri)
 	}
@@ -66,16 +48,16 @@ func main() {
 	http.HandleFunc("/", indexHandle)
 	http.HandleFunc("/run", runHandle)
 	http.HandleFunc("/ws", wsHandle)
-	log.Println(" ^_^ 服务已启动...")
 
 	//启动服务端口
 	addr := ":" + strconv.Itoa(*port)
+	log.Println(" ^_^ 服务已启动...")
 	http.ListenAndServe(addr, nil)
-
 }
 
+//首页
 func indexHandle(w http.ResponseWriter, r *http.Request) {
-	s := "小手端口扫描器 "+version+" (by:Duzhenxun)"
+	s := "小手端口扫描 "+version+" (by:Duzhenxun)"
 	w.Write([]byte(s))
 }
 
@@ -174,7 +156,6 @@ func wsHandle(w http.ResponseWriter, r *http.Request) {
 	wConn = wsConn.New(wsSocket)
 	for {
 		data, err := wConn.ReadMessage()
-		fmt.Println(data)
 		if err != nil {
 			wConn.Close()
 			return
@@ -186,11 +167,26 @@ func wsHandle(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
+//系统信息
+func serverUriOsInfo(serverUri string)  string{
+	osInfo := map[string]interface{}{}
+	osInfo["version"] = version
+	osInfo["os"] = runtime.GOOS
+	osInfo["cpu"] = runtime.NumCPU()
+	addrArr, _ := net.InterfaceAddrs()
+	osInfo["addr"] = fmt.Sprint(addrArr)
+	osInfo["time"] = time.Now().Unix()
+	osInfos, _ := json.Marshal(osInfo)
+	osBase = base64.StdEncoding.EncodeToString(osInfos)
+	token := hmacSha256(osBase, "dzx")
+	serverUri += "Z00X" + base64.StdEncoding.EncodeToString([]byte("&os_base||"+osBase+"&token||"+token))
+	return serverUri
+}
+
 func usage(str string) {
 	fmt.Fprintf(os.Stderr, str)
 	flag.PrintDefaults()
 }
-
 func mkdir(path string) (string, error) {
 	delimiter := "/"
 	dir, _ := filepath.Abs(filepath.Dir(os.Args[0]))
@@ -201,20 +197,17 @@ func mkdir(path string) (string, error) {
 	}
 	return filePtah, nil
 }
-
 func open(uri string) error {
 	var commands = map[string]string{
-		//"windows": "start",
 		"windows": "start",
 		"darwin":  "open",
 		"linux":   "xdg-open",
 	}
 	run, ok := commands[runtime.GOOS]
 	if !ok {
-		return fmt.Errorf("don't know how to open things on %s platform", runtime.GOOS)
+		return fmt.Errorf("%s platform ？？？", runtime.GOOS)
 	}
 
-	//fmt.Println(uri)
 	var cmd *exec.Cmd
 	if runtime.GOOS == "windows" {
 		cmd = exec.Command("cmd", "/c", "start ", uri)
@@ -224,7 +217,6 @@ func open(uri string) error {
 	}
 	return cmd.Start()
 }
-
 func hmacSha256(src string, secret string) string {
 	h := hmac.New(sha256.New, []byte(secret))
 	h.Write([]byte(src))
