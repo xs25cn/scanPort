@@ -1,0 +1,140 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="utf-8"/>
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <!-- 上述3个meta标签*必须*放在最前面，任何其他内容都*必须*跟随其后！ -->
+    <link href="favicon.ico" rel="shortcut icon"/>
+    <title>小手端口扫描工具,golang版高性能端口扫描工具</title>
+	 <meta name="keywords" content="小手端口检测，端口检测，端口扫描，端口工具,在线端口扫描,端口开放检查" />
+	    <meta name="description" content="小手端口扫描是一款高性能端口扫描工具，使用golang开发，可以扫描内网与外网的ip 开放端口是否开放，速度超级快" />
+    <!-- Bootstrap -->
+    <link rel="stylesheet" href="https://stackpath.bootstrapcdn.com/bootstrap/3.4.1/css/bootstrap.min.css"
+          integrity="sha384-HSMxcRTRxnN+Bdg0JdbxYKrThecOKuH5zCYotlSAcp1+c8xmyTe9GYg1l9a69psu"
+          crossorigin="anonymous">
+
+    <!-- HTML5 shim 和 Respond.js 是为了让 IE8 支持 HTML5 元素和媒体查询（media queries）功能 -->
+    <!-- 警告：通过 file:// 协议（就是直接将 html 页面拖拽到浏览器中）访问页面时 Respond.js 不起作用 -->
+    <!--[if lt IE 9]>
+    <script src="https://cdn.jsdelivr.net/npm/html5shiv@3.7.3/dist/html5shiv.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/respond.js@1.4.2/dest/respond.min.js"></script>
+    <![endif]-->
+    <script src="https://cdn.jsdelivr.net/npm/vue@2"></script>
+    <script src="https://unpkg.com/axios/dist/axios.min.js"></script>
+
+</head>
+<body>
+<div class="container-fluid">
+    <div class="row">
+        <div class="col-xs-12 col-md-12" id="app">
+            <h2>
+				 端口扫描工具
+                <mark>{{httpStatus}}</mark>
+            </h2>
+			<h5>源码：<a href="https://github.com/xs25cn/scanPort">https://github.com/xs25cn/scanPort</a> <img src="https://img.shields.io/github/stars/xs25cn/scanPort?style=social"></h5>
+            <form>
+                <div class="form-group has-success has-feedback">
+                    <div class="input-group">
+                        <span class="input-group-addon">域名或IP</span>
+                        <input type="text" v-model="ip" name="ip" class="form-control">
+                   
+					</div>
+					<p class="text-muted">例子：ip范围 192.168.0.1-255</p>
+                </div>
+                <div class="form-group has-success has-feedback">
+                    <div class="input-group">
+                        <span class="input-group-addon">端口</span>
+                        <input type="text" v-model="port" name="port" class="form-control">
+                    </div>
+					<p class="text-muted">例子：端口范围 80,3306,1000-9000 <p>
+					
+                </div>
+				
+                <div>
+                    <p class="bg-info" style="padding: 5px;">运行状态：{{message}}</p>
+                </div>
+                <div class="form-group">
+                 <textarea ref="run" class="form-control" rows="10" style="background-color: black;color:#ffcc00;padding: 10px;">{{runText}}</textarea>
+				</div>
+				
+                <button type="button" class="btn btn-success" v-on:click="down('abc', $event)">执行</button>
+
+            </form>
+        </div>
+    </div>
+</div>
+</body>
+
+<script>
+    new Vue({
+        el: '#app',
+        data: {
+            httpPort: 25252,
+            osInfo: "",
+            httpServer: "127.0.0.1",
+            message: '等待中',
+            httpStatus: '',
+            runText: '',
+            timeout: '',
+            debug: '',
+            ip: "baidu.com",
+            port: "80,21,22,23,25,53,110,443,1433,1863,2289,3306,5631,5632,5000,8080,9090",
+        },
+        methods: {
+            getPort: function () {
+                let query = window.location.search.substring(1)
+                let vars = query.split("&");
+                let pair = vars[0].split("=");
+                if (pair[0] == "p") {
+                    this.httpPort = pair[1].split("Z00X")[0]
+                }
+                return this.httpPort
+            },
+            //下载数据
+            down: function (str, e) {
+
+                //先建立一个webscoket
+                this.webSocketTest();
+
+                const _this = this
+                const server_url = "http://" + this.httpServer + ":" + this.getPort() + "/run"
+                axios({
+                    headers: {
+                        'Content-Type': 'application/x-www-form-urlencoded; charset=UTF-8',
+                    },
+                    method: 'post',
+                    url: server_url,
+                    data: {
+                        ip: this.ip,
+                        port: this.port
+                    }
+                }).then(function (response) {
+                    _this.httpStatus = response.data.msg;
+                });
+            },
+            webSocketTest: function () {
+                const _this = this
+                let ws = new WebSocket("ws://" + this.httpServer + ":" + this.getPort() + "/ws?id=1");
+                ws.onopen = function () {
+					console.log("建立连接")
+                    _this.message = "建立连接"
+                };
+                ws.onmessage = function (evt) {
+                    console.log(evt.data)
+                    _this.runText += evt.data + "\n"
+                    let r = _this.$refs.run
+                    r.scroll(0, r.scrollHeight)
+                };
+                ws.onclose = function () {
+                    _this.message = "连接关闭"
+                };
+            }
+        }
+    });
+</script>
+
+<div style="display: none;">
+	<script type="text/javascript" src="https://s4.cnzz.com/z_stat.php?id=1280178555&web_id=1280178555"></script>
+</div>
+</html>

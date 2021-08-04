@@ -1,0 +1,4 @@
+# github.com/gorilla/websocket v1.4.2
+github.com/gorilla/websocket
+# github.com/xs25cn/scanPort v0.0.0-20200114082402-de773d2b0349
+github.com/xs25cn/scanPort/scan

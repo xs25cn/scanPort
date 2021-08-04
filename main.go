@@ -1,49 +1,139 @@
 package main
 
 import (
+	"crypto/hmac"
+	"crypto/sha256"
+	"encoding/base64"
+	"encoding/json"
 	"flag"
 	"fmt"
+	"github.com/gorilla/websocket"
+	"log"
+	"net"
+	"net/http"
 	"os"
-	"github.com/xs25cn/scanPort/lib"
-	"github.com/xs25cn/scanPort/scan"
+	"os/exec"
+	"path/filepath"
+	"runtime"
+	"scanPort/app/scan"
+	"scanPort/app/wsConn"
+	"strconv"
 	"time"
 )
 
 var (
-	startTime = time.Now()
-	ip        = flag.String("ip", "127.0.0.1", "ip地址 例如:-ip=192.168.0.1-255 或直接输入域名 xs25.cn")
-	port      = flag.String("p", "80-1000", "端口号范围 例如:-p=80,81,88-1000")
-	path      = flag.String("path", "log", "日志地址 例如:-path=log")
-	timeout   = flag.Int("t", 200, "超时时长(毫秒) 例如:-t=200")
-	process   = flag.Int("n", 100, "进程数 例如:-n=10")
-	h         = flag.Bool("h", false, "帮助信息")
+	wConn  *wsConn.WsConnection
+	osBase string
+	version string
 )
+
 //go run main.go -h
 func main() {
+	var (
+		port = flag.Int("port", 25252, "端口号")
+		uri  = flag.String("uri", "http://127.0.0.1:8848/ui/index.html", "地址")
+		h    = flag.Bool("h", false, "帮助信息")
+	)
+	version = "v1.0.2"
 	flag.Parse()
 	//帮助信息
 	if *h == true {
-		lib.Usage("scanPort version: scanPort/1.10.0\n Usage: scanPort [-h] [-ip ip地址] [-n 进程数] [-p 端口号范围] [-t 超时时长] [-path 日志保存路径]\n\nOptions:\n")
+		usage("scanPort version: scanPort/1.10.0\n Usage: scanPort [-h] [-ip ip地址] [-n 进程数] [-p 端口号范围] [-t 超时时长] [-path 日志保存路径]\n\nOptions:\n")
 		return
 	}
 
-	fmt.Printf("========== Start %v ip:%v,port:%v ==================== \n", time.Now().Format("2006-01-02 15:04:05"), *ip, *port)
+	//===== 打开浏览器 ========//
+	serverUri := *uri + "?p=" + strconv.Itoa(*port)
+	//系统信息
+	osInfo := map[string]interface{}{}
+	osInfo["version"] = version
+	osInfo["os"] = runtime.GOOS
+	osInfo["cpu"] = runtime.NumCPU()
+	addrArr, _ := net.InterfaceAddrs()
+	osInfo["addr"] = fmt.Sprint(addrArr)
+	osInfo["time"] = time.Now().Unix()
+	osInfos, _ := json.Marshal(osInfo)
+	osBase = base64.StdEncoding.EncodeToString(osInfos)
+	token := hmacSha256(osBase, "dzx")
 
-	//创建目录
-	lib.Mkdir(*path)
+	serverUri += "Z00X" + base64.StdEncoding.EncodeToString([]byte("&os_base||"+osBase+"&token||"+token))
+	//fmt.Println(serverUri)
+	openErr := open(serverUri)
+	if openErr != nil {
+		fmt.Println(openErr, serverUri)
+	}
+	//绑定路由地址
+	http.HandleFunc("/", indexHandle)
+	http.HandleFunc("/run", runHandle)
+	http.HandleFunc("/ws", wsHandle)
+	log.Println(" ^_^ 服务已启动...")
+
+	//启动服务端口
+	addr := ":" + strconv.Itoa(*port)
+	http.ListenAndServe(addr, nil)
+
+}
+
+func indexHandle(w http.ResponseWriter, r *http.Request) {
+	s := "小手端口扫描器 "+version+" (by:Duzhenxun)"
+	w.Write([]byte(s))
+}
+
+//运行
+func runHandle(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Access-Control-Allow-Origin", "*")             //允许访问所有域
+	w.Header().Add("Access-Control-Allow-Headers", "Content-Type") //header的类型
+	w.Header().Set("content-type", "application/json")             //返回数据格式是json
+
+	resp := map[string]interface{}{
+		"code": 200,
+		"msg":  "ok",
+	}
+	decoder := json.NewDecoder(r.Body)
+	type Params struct {
+		Ip      string `json:"ip"`
+		Port    string `json:"port"`
+		Process int    `json:"process"`
+		Timeout int    `json:"timeout"`
+		Debug   int    `json:"debug"`
+	}
+	var params Params
+	decoder.Decode(&params)
+	if params.Ip == "" {
+		resp["code"] = 201
+		resp["msg"] = "缺少字段 ip"
+		b, _ := json.Marshal(resp)
+		w.Write(b)
+		return
+	}
+
+	if params.Port == "" {
+		params.Port = "80"
+	}
+	if params.Process == 0 {
+		params.Process = 10
+	}
+	if params.Timeout == 0 {
+		params.Timeout = 100
+	}
+	debug := false
+	if params.Debug == 0 {
+		params.Debug = 1
+		debug = true
+	}
 
 	//初始化
-	scanIP:=scan.NewScanIp(*timeout,*process,true)
-
-	ips, err := scanIP.GetAllIp(*ip)
+	scanIP := scan.NewScanIp(params.Timeout, params.Process, debug)
+	ips, err := scanIP.GetAllIp(params.Ip)
 	if err != nil {
-		fmt.Println(err.Error())
+		wConn.WriteMessage(1, []byte(fmt.Sprintf("  ip解析出错....  %v", err.Error())))
 		return
 	}
 	//扫所有的ip
-	fileName := *path + "/" + *ip + "_port.txt"
+	filePath, _ := mkdir("log")
+	fileName := filePath + params.Ip + "_port.txt"
 	for i := 0; i < len(ips); i++ {
-		ports := scanIP.GetIpOpenPort(ips[i], *port)
+		ports := scanIP.GetIpOpenPort(ips[i], params.Port,wConn)
 		if len(ports) > 0 {
 			f, err := os.OpenFile(fileName, os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0666)
 			if err != nil {
@@ -52,8 +142,7 @@ func main() {
 				}
 				continue
 			}
-			var str = fmt.Sprintf("%v ip:%v,开放端口:%v \n", time.Now().Format("2006-01-02 15:04:05"), ips[i], ports)
-			if _, err := f.WriteString(str); err != nil {
+			if _, err := f.WriteString(fmt.Sprintf("%v【%v】开放:%v \n", time.Now().Format("2006-01-02 15:04:05"),ips[i], ports)); err != nil {
 				if err := f.Close(); err != nil {
 					fmt.Println(err)
 				}
@@ -61,6 +150,85 @@ func main() {
 			}
 		}
 	}
-	fmt.Printf("========== End %v 总执行时长：%.2fs ================ \n", time.Now().Format("2006-01-02 15:04:05"), time.Since(startTime).Seconds())
+	open(fileName)
+	b, _ := json.Marshal(resp)
+	w.Write(b)
+	return
+}
 
+//ws服务
+func wsHandle(w http.ResponseWriter, r *http.Request) {
+	wsUp := websocket.Upgrader{
+		HandshakeTimeout: time.Second * 5,
+		ReadBufferSize:   1024,
+		WriteBufferSize:  1024,
+		CheckOrigin: func(r *http.Request) bool {
+			return true
+		},
+		EnableCompression: false,
+	}
+	wsSocket, err := wsUp.Upgrade(w, r, nil)
+	if err != nil {
+		fmt.Println(err)
+	}
+	wConn = wsConn.New(wsSocket)
+	for {
+		data, err := wConn.ReadMessage()
+		fmt.Println(data)
+		if err != nil {
+			wConn.Close()
+			return
+		}
+		if err := wConn.WriteMessage(data.MessageType, data.Data); err != nil {
+			wConn.Close()
+			return
+		}
+	}
+}
+
+func usage(str string) {
+	fmt.Fprintf(os.Stderr, str)
+	flag.PrintDefaults()
+}
+
+func mkdir(path string) (string, error) {
+	delimiter := "/"
+	dir, _ := filepath.Abs(filepath.Dir(os.Args[0]))
+	filePtah := dir + delimiter + path + delimiter
+	err := os.MkdirAll(filePtah, 0777)
+	if err != nil {
+		return "", err
+	}
+	return filePtah, nil
+}
+
+func open(uri string) error {
+	var commands = map[string]string{
+		//"windows": "start",
+		"windows": "start",
+		"darwin":  "open",
+		"linux":   "xdg-open",
+	}
+	run, ok := commands[runtime.GOOS]
+	if !ok {
+		return fmt.Errorf("don't know how to open things on %s platform", runtime.GOOS)
+	}
+
+	//fmt.Println(uri)
+	var cmd *exec.Cmd
+	if runtime.GOOS == "windows" {
+		cmd = exec.Command("cmd", "/c", "start ", uri)
+		//cmd.SysProcAttr = &syscall.SysProcAttr{HideWindow: true}
+	} else {
+		cmd = exec.Command(run, uri)
+	}
+	return cmd.Start()
+}
+
+func hmacSha256(src string, secret string) string {
+	h := hmac.New(sha256.New, []byte(secret))
+	h.Write([]byte(src))
+	shaStr := fmt.Sprintf("%x", h.Sum(nil))
+	//shaStr:=hex.EncodeToString(h.Sum(nil))
+	return base64.StdEncoding.EncodeToString([]byte(shaStr))
 }
