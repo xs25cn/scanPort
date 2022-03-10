@@ -71,16 +71,15 @@ func (s *ScanIp) GetIpOpenPort(ip string, port string,wsConn *wsConn.WsConnectio
 				if opened {
 					tmpPorts = append(tmpPorts, value[i])
 					s.sendLog(fmt.Sprintf("【%v】端口:%v ............... 开放 ............... ", ip, value[i]),wsConn)
-
 				}else{
-					s.sendLog(fmt.Sprintf("【%v】端口:%v 关闭", ip, value[i]),wsConn)
+					//s.sendLog(fmt.Sprintf("【%v】端口:%v 关闭", ip, value[i]),wsConn)
 				}
 			}
 			mutex.Lock()
 			openPorts = append(openPorts, tmpPorts...)
 			mutex.Unlock()
 			if len(tmpPorts) > 0 {
-				//s.sendLog(fmt.Sprintf("【%v】协程%v 执行完成，时长： %.3fs，开放端口： %v",  ip, key, time.Since(start).Seconds(), tmpPorts),wsConn)
+				s.sendLog(fmt.Sprintf("【%v】协程%v 执行完成，时长： %.3fs，开放端口： %v",  ip, key, time.Since(start).Seconds(), tmpPorts),wsConn)
 			}
 		}(v, k)
 	}
