@@ -20,16 +20,16 @@ type ScanIp struct {
 	process int
 }
 
-func NewScanIp(timeout int,process int,debug bool) *ScanIp {
+func NewScanIp(timeout int, process int, debug bool) *ScanIp {
 	return &ScanIp{
-		debug:debug,
-		timeout:timeout,
-		process:process,
+		debug:   debug,
+		timeout: timeout,
+		process: process,
 	}
 }
 
 //获取开放端口号
-func (s *ScanIp) GetIpOpenPort(ip string, port string,wsConn *wsConn.WsConnection) []int {
+func (s *ScanIp) GetIpOpenPort(ip string, port string, wsConn *wsConn.WsConnection) []int {
 	var (
 		total     int
 		pageCount int
@@ -46,8 +46,7 @@ func (s *ScanIp) GetIpOpenPort(ip string, port string,wsConn *wsConn.WsConnectio
 	}
 	num = int(math.Ceil(float64(total) / float64(pageCount)))
 
-	s.sendLog(fmt.Sprintf("【%v】需要扫描端口总数:%v 个，总协程:%v 个，并发:%v 个，超时:%d 毫秒",ip, total, pageCount, num, s.timeout),wsConn)
-
+	s.sendLog(fmt.Sprintf("【%v】需要扫描端口总数:%v 个，总协程:%v 个，并发:%v 个，超时:%d 毫秒", ip, total, pageCount, num, s.timeout), wsConn)
 
 	start := time.Now()
 	all := map[int][]int{}
@@ -70,21 +69,22 @@ func (s *ScanIp) GetIpOpenPort(ip string, port string,wsConn *wsConn.WsConnectio
 				opened := s.isOpen(ip, value[i])
 				if opened {
 					tmpPorts = append(tmpPorts, value[i])
-					s.sendLog(fmt.Sprintf("【%v】端口:%v ............... 开放 ............... ", ip, value[i]),wsConn)
-				}else{
-					//s.sendLog(fmt.Sprintf("【%v】端口:%v 关闭", ip, value[i]),wsConn)
+					s.sendLog(fmt.Sprintf("【%v】端口:%v ............... 开放 ............... ", ip, value[i]), wsConn)
+				} else {
+					//s.sendLog(fmt.Sprintf("【%v】端口:%v 关闭", ip, value[i]), wsConn)
+					fmt.Println(fmt.Sprintf("【%v】端口:%v 关闭", ip, value[i]))
 				}
 			}
 			mutex.Lock()
 			openPorts = append(openPorts, tmpPorts...)
 			mutex.Unlock()
 			if len(tmpPorts) > 0 {
-				s.sendLog(fmt.Sprintf("【%v】协程%v 执行完成，时长： %.3fs，开放端口： %v",  ip, key, time.Since(start).Seconds(), tmpPorts),wsConn)
+				s.sendLog(fmt.Sprintf("【%v】协程%v 执行完成，时长： %.3fs，开放端口： %v", ip, key, time.Since(start).Seconds(), tmpPorts), wsConn)
 			}
 		}(v, k)
 	}
 	wg.Wait()
-	s.sendLog(fmt.Sprintf("【%v】^_^扫描结束，执行时长%.3fs , 所有开放的端口:%v",ip, time.Since(start).Seconds(), openPorts),wsConn)
+	s.sendLog(fmt.Sprintf("【%v】^_^扫描结束，执行时长%.3fs , 所有开放的端口:%v", ip, time.Since(start).Seconds(), openPorts), wsConn)
 	return openPorts
 }
 
@@ -125,16 +125,13 @@ func (s *ScanIp) GetAllIp(ip string) ([]string, error) {
 	return ips, nil
 }
 
-
-
 //记录日志
-func (s *ScanIp) sendLog(str string,wsConn *wsConn.WsConnection) {
-	//if s.debug == true {
-		//fmt.Println(str)
-		wsConn.WriteMessage(1,[]byte(str))
-	//}
+func (s *ScanIp) sendLog(str string, wsConn *wsConn.WsConnection) {
+	if s.debug == true {
+		fmt.Println(str)
+		wsConn.WriteMessage(1, []byte(str))
+	}
 }
-
 
 //获取所有端口
 func (s *ScanIp) getAllPort(port string) ([]int, error) {
@@ -177,14 +174,12 @@ func (s *ScanIp) filterPort(str string) (int, error) {
 	return port, nil
 }
 
-
-
 //查看端口号是否打开
 func (s *ScanIp) isOpen(ip string, port int) bool {
 	conn, err := net.DialTimeout("tcp", fmt.Sprintf("%s:%d", ip, port), time.Millisecond*time.Duration(s.timeout))
 	if err != nil {
-		if strings.Contains(err.Error(),"too many open files"){
-			fmt.Println("连接数超出系统限制！"+err.Error())
+		if strings.Contains(err.Error(), "too many open files") {
+			fmt.Println("连接数超出系统限制！" + err.Error())
 			os.Exit(1)
 		}
 		return false
