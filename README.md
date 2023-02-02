@@ -6,15 +6,22 @@
 先来体验一下运行后的效果：
 
 ### v1.0版
+纯命令行执行
 ![image.png](https://upload-images.jianshu.io/upload_images/19018717-e8826aa18d92aa57.png?imageMogr2/auto-orient/strip%7CimageView2/2/w/1240)
 
 ![image.png](https://upload-images.jianshu.io/upload_images/19018717-f62194125b0a4a5b.png?imageMogr2/auto-orient/strip%7CimageView2/2/w/1240)
+v1.0版下载地址：https://github.com/xs25cn/scanPort/releases/tag/v1.0
+
 
 ### v2.0版
 改版后直接浏览器内操作即可
 ![](https://tva1.sinaimg.cn/large/008i3skNly1gt4rg43sqgj30iq0h7aay.jpg)
 
+### v2.1版 
+修复bug
+
 ### 安装使用
 你可以直接下载已编译好的文件直接运行
 https://github.com/xs25cn/scanPort/tree/master/bin
+
 

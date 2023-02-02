@@ -29,7 +29,7 @@
     <div class="row">
         <div class="col-xs-12 col-md-12" id="app">
             <h2>
-				 小手端口扫描工具 v2.0
+				 小手端口扫描工具 v2.1
                 <mark>{{httpStatus}}</mark>
             </h2>
 			
@@ -98,12 +98,12 @@
             },
             //下载数据
             down: function (str, e) {
-
+                console.log(str)
                 //先建立一个webscoket
                 this.webSocketTest();
-
                 const _this = this
-                const server_url = "http://" + this.httpServer + ":" + this.getPort() + "/run"
+                const server_url = "http://" + this.httpServer + ":" + this.getPort() + "/run?ip="+this.ip+"&port="+this.port
+                console.log(server_url)
                 axios({
                     headers: {
                         'Content-Type': 'application/x-www-form-urlencoded; charset=UTF-8',
@@ -115,6 +115,7 @@
                         port: this.port
                     }
                 }).then(function (response) {
+                    console.log(response)
                     _this.httpStatus = response.data.msg;
                 });
             },
@@ -126,6 +127,7 @@
                     _this.message = "建立连接"
                 };
                 ws.onmessage = function (evt) {
+                    console.log("=============")
                     console.log(evt.data)
                     _this.runText += evt.data + "\n"
                     let r = _this.$refs.run

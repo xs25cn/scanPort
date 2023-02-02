@@ -7,7 +7,6 @@ import (
 	"encoding/json"
 	"flag"
 	"fmt"
-	"github.com/gorilla/websocket"
 	"log"
 	"net"
 	"net/http"
@@ -19,11 +18,13 @@ import (
 	"scanPort/app/wsConn"
 	"strconv"
 	"time"
+
+	"github.com/gorilla/websocket"
 )
 
 var (
-	wConn  *wsConn.WsConnection
-	osBase string
+	wConn   *wsConn.WsConnection
+	osBase  string
 	version string
 )
 
@@ -32,15 +33,17 @@ func main() {
 		port = flag.Int("port", 25252, "端口号")
 		h    = flag.Bool("h", false, "帮助信息")
 	)
-	version = "v2.0"
+	version = "v2.1"
 	flag.Parse()
 	//帮助信息
 	if *h == true {
-		usage("scanPort version: scanPort/v2.0\n Usage: scanPort [-h] [-ip ip地址] [-n 进程数] [-p 端口号范围] [-t 超时时长] [-path 日志保存路径]\n\nOptions:\n")
+		usage("scanPort version: scanPort/v2.1\n Usage: scanPort [-h] [-ip ip地址] [-n 进程数] [-p 端口号范围] [-t 超时时长] [-path 日志保存路径]\n\nOptions:\n")
 		return
 	}
-	serverUri :=  "https://ip.xs25.cn/?p=" + strconv.Itoa(*port)
-	openErr := open(serverUriOsInfo(serverUri))
+	serverUri := "https://ip.xs25.cn"
+	//serverUri:=fmt.Sprintf("http://127.0.0.1:%d",*port)
+	//openErr := open(serverUriOsInfo(serverUri))
+	openErr := open(serverUri)
 	if openErr != nil {
 		fmt.Println(openErr, serverUri)
 	}
@@ -57,21 +60,32 @@ func main() {
 
 //首页
 func indexHandle(w http.ResponseWriter, r *http.Request) {
-	s := "小手端口扫描 "+version+" (by:Duzhenxun)"
+	s := "小手端口扫描 " + version + " (by:Duzhenxun)"
 	w.Write([]byte(s))
+	//http.FileServer(http.Dir("app/ui"))
 }
 
 //运行
 func runHandle(w http.ResponseWriter, r *http.Request) {
-	w.Header().Set("Access-Control-Allow-Origin", "*")             //允许访问所有域
-	w.Header().Add("Access-Control-Allow-Headers", "Content-Type") //header的类型
-	w.Header().Set("content-type", "application/json")             //返回数据格式是json
-
 	resp := map[string]interface{}{
 		"code": 200,
 		"msg":  "ok",
 	}
-	decoder := json.NewDecoder(r.Body)
+
+	w.Header().Set("Access-Control-Allow-Origin", "*")             //允许访问所有域
+	w.Header().Add("Access-Control-Allow-Headers", "Content-Type") //header的类型
+	w.Header().Set("content-type", "application/json")             //返回数据格式是json
+	query := r.URL.Query()
+	scanIp := query.Get("ip")
+	scanPort := query.Get("port")
+	if scanIp == "" || scanPort == "" {
+		resp["code"] = 201
+		resp["msg"] = "ip或端口号不能为空"
+
+		b, _ := json.Marshal(resp)
+		w.Write(b)
+		return
+	}
 	type Params struct {
 		Ip      string `json:"ip"`
 		Port    string `json:"port"`
@@ -79,31 +93,14 @@ func runHandle(w http.ResponseWriter, r *http.Request) {
 		Timeout int    `json:"timeout"`
 		Debug   int    `json:"debug"`
 	}
-	var params Params
-	decoder.Decode(&params)
-	if params.Ip == "" {
-		resp["code"] = 201
-		resp["msg"] = "缺少字段 ip"
-		b, _ := json.Marshal(resp)
-		w.Write(b)
-		return
+	params := Params{
+		Ip:      scanIp,
+		Port:    scanPort,
+		Process: 10,
+		Timeout: 100,
+		Debug:   1,
 	}
-
-	if params.Port == "" {
-		params.Port = "80"
-	}
-	if params.Process == 0 {
-		params.Process = 10
-	}
-	if params.Timeout == 0 {
-		params.Timeout = 100
-	}
-	debug := false
-	if params.Debug == 0 {
-		params.Debug = 1
-		debug = true
-	}
-
+	debug := true
 	//初始化
 	scanIP := scan.NewScanIp(params.Timeout, params.Process, debug)
 	ips, err := scanIP.GetAllIp(params.Ip)
@@ -115,7 +112,7 @@ func runHandle(w http.ResponseWriter, r *http.Request) {
 	filePath, _ := mkdir("log")
 	fileName := filePath + params.Ip + "_port.txt"
 	for i := 0; i < len(ips); i++ {
-		ports := scanIP.GetIpOpenPort(ips[i], params.Port,wConn)
+		ports := scanIP.GetIpOpenPort(ips[i], params.Port, wConn)
 		if len(ports) > 0 {
 			f, err := os.OpenFile(fileName, os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0666)
 			if err != nil {
@@ -124,7 +121,7 @@ func runHandle(w http.ResponseWriter, r *http.Request) {
 				}
 				continue
 			}
-			if _, err := f.WriteString(fmt.Sprintf("%v【%v】开放:%v \n", time.Now().Format("2006-01-02 15:04:05"),ips[i], ports)); err != nil {
+			if _, err := f.WriteString(fmt.Sprintf("%v【%v】开放:%v \n", time.Now().Format("2006-01-02 15:04:05"), ips[i], ports)); err != nil {
 				if err := f.Close(); err != nil {
 					fmt.Println(err)
 				}
@@ -168,7 +165,7 @@ func wsHandle(w http.ResponseWriter, r *http.Request) {
 }
 
 //系统信息
-func serverUriOsInfo(serverUri string)  string{
+func serverUriOsInfo(serverUri string) string {
 	osInfo := map[string]interface{}{}
 	osInfo["version"] = version
 	osInfo["os"] = runtime.GOOS
